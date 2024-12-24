@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <nav class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-alt text-blue-600 text-2xl mr-3"></i>
+                        <h1 class="text-2xl font-bold text-gray-900">AI Resume Analyzer</h1>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Upload Section -->
+                <div class="md:col-span-2">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold mb-4">Upload Your Resume</h2>
+                        
+                        <!-- Upload Area -->
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center"
+                             @dragover.prevent
+                             @drop.prevent="handleFileDrop">
+                            
+                            <div v-if="!selectedFile">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                                <p class="text-gray-600 mb-2">Drag and drop your PDF resume here or</p>
+                                <input type="file" 
+                                       ref="fileInput" 
+                                       @change="handleFileSelect" 
+                                       accept=".pdf"
+                                       class="hidden">
+                                <button @click="$refs.fileInput.click()"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                                    Browse Files
+                                </button>
+                            </div>
+                            
+                            <div v-else>
+                                <p class="text-green-600 mb-2">
+                                    <i class="fas fa-file-pdf mr-2"></i>${selectedFile.name}
+                                </p>
+                                <div class="flex justify-center gap-3">
+                                    <button @click="analyzeResume"
+                                            :disabled="isAnalyzing"
+                                            class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+                                        ${isAnalyzing ? 'Analyzing...' : 'Analyze Resume'}
+                                    </button>
+                                    <button @click="resetFile"
+                                            class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition">
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div v-if="error" class="mt-4 p-4 bg-red-100 text-red-700 rounded-md">
+                            ${error}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tips Section -->
+                <div class="md:col-span-1">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold mb-4">Tips for Better Results</h2>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                <span>Ensure your PDF is text-searchable (not scanned)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                <span>Include relevant skills and technologies</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                <span>List quantifiable achievements</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                <span>Keep formatting simple and professional</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div v-if="analysisData" class="mt-8">
+                <!-- Skills Section -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Your Top Skills</h2>
+                    <div class="flex flex-wrap gap-2">
+                        <span v-for="skill in analysisData.top_skills" 
+                              class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                            ${skill}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Job Recommendations -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-semibold">Recommended Jobs</h2>
+                    <div v-for="job in analysisData.recommended_jobs" 
+                         class="bg-white rounded-lg shadow p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-medium">${job.title}</h3>
+                                <p class="text-gray-600">${job.company} • ${job.location}</p>
+                                <p class="text-gray-700 mt-1">${job.salary_range}</p>
+                            </div>
+                            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full">
+                                ${job.match_score} Match
+                            </span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h4 class="font-medium mb-2">Job Description:</h4>
+                            <p class="text-gray-700">${job.job_description}</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="font-medium mb-2">Why This Matches:</h4>
+                                <ul class="list-disc list-inside space-y-1 text-gray-600">
+                                    <li v-for="reason in job.reasons">${reason}</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-medium mb-2">Required Skills:</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <span v-for="skill in job.required_skills" 
+                                          class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                                        ${skill}
+                                    </span>
+                                </div>
+
+                                <div v-if="job.missing_skills.length" class="mt-4">
+                                    <h4 class="font-medium mb-2">Skills to Develop:</h4>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span v-for="skill in job.missing_skills" 
+                                              class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                                            ${skill}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t">
+                            <h4 class="font-medium mb-3">Apply Now:</h4>
+                            <div class="flex flex-wrap gap-3">
+                                <a v-for="(url, platform) in job.application_links"
+                                   :href="url"
+                                   target="_blank"
+                                   class="inline-flex items-center px-4 py-2 rounded-md transition"
+                                   :class="{
+                                       'bg-blue-600 hover:bg-blue-700 text-white': platform === 'linkedin',
+                                       'bg-blue-500 hover:bg-blue-600 text-white': platform === 'indeed',
+                                       'bg-green-600 hover:bg-green-700 text-white': platform === 'glassdoor',
+                                       'bg-gray-600 hover:bg-gray-700 text-white': platform === 'company_website'
+                                   }">
+                                    <i v-if="platform === 'linkedin'" class="fab fa-linkedin mr-2"></i>
+                                    ${platform.charAt(0).toUpperCase() + platform.slice(1).replace('_', ' ')}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Improvement Areas -->
+                <div v-if="analysisData.improvement_areas" class="mt-8 bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Areas for Improvement</h2>
+                    <ul class="list-disc list-inside space-y-2 text-gray-600">
+                        <li v-for="area in analysisData.improvement_areas">${area}</li>
+                    </ul>
+                </div>
+
+                <!-- Job Search Tips -->
+                <div v-if="analysisData.job_search_tips" class="mt-8 bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Job Search Tips</h2>
+                    <ul class="list-disc list-inside space-y-2 text-gray-600">
+                        <li v-for="tip in analysisData.job_search_tips">${tip}</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+
+        createApp({
+            delimiters: ['${', '}'],
+            setup() {
+                const selectedFile = ref(null)
+                const error = ref(null)
+                const isAnalyzing = ref(false)
+                const analysisData = ref(null)
+                const fileInput = ref(null)
+
+                const handleFileSelect = (event) => {
+                    const file = event.target.files[0]
+                    if (file && file.type === 'application/pdf') {
+                        selectedFile.value = file
+                        error.value = null
+                    } else {
+                        error.value = 'Please upload a PDF file'
+                    }
+                }
+
+                const handleFileDrop = (event) => {
+                    const file = event.dataTransfer.files[0]
+                    if (file && file.type === 'application/pdf') {
+                        selectedFile.value = file
+                        error.value = null
+                    } else {
+                        error.value = 'Please upload a PDF file'
+                    }
+                }
+
+                const resetFile = () => {
+                    selectedFile.value = null
+                    error.value = null
+                    analysisData.value = null
+                    if (fileInput.value) {
+                        fileInput.value.value = ''
+                    }
+                }
+
+                const analyzeResume = async () => {
+                    if (!selectedFile.value) return
+
+                    isAnalyzing.value = true
+                    error.value = null
+
+                    const formData = new FormData()
+                    formData.append('resume', selectedFile.value)
+
+                    try {
+                        const response = await fetch('/analyze', {
+                            method: 'POST',
+                            body: formData
+                        })
+
+                        const data = await response.json()
+
+                        if (response.ok) {
+                            try {
+                                analysisData.value = typeof data.analysis === 'string' 
+                                    ? JSON.parse(data.analysis) 
+                                    : data.analysis
+                            } catch (e) {
+                                error.value = 'Error parsing analysis results'
+                                console.error('Parsing error:', e)
+                            }
+                        } else {
+                            error.value = data.error || 'An error occurred during analysis'
+                        }
+                    } catch (e) {
+                        error.value = 'Network error during analysis'
+                        console.error('Network error:', e)
+                    } finally {
+                        isAnalyzing.value = false
+                    }
+                }
+
+                return {
+                    selectedFile,
+                    error,
+                    isAnalyzing,
+                    analysisData,
+                    fileInput,
+                    handleFileSelect,
+                    handleFileDrop,
+                    resetFile,
+                    analyzeResume
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
